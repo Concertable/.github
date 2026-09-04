@@ -1,0 +1,31 @@
+name: Reusable rollback validation
+
+on:
+  workflow_call:
+    inputs:
+      rollback: {required: true, type: string}
+      target-manifest: {required: true, type: string}
+
+permissions: {contents: read}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - name: Require immutable rollback target and operator evidence
+        env:
+          ROLLBACK: ${{ inputs.rollback }}
+          TARGET: ${{ inputs.target-manifest }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          rollback = json.load(open(os.environ['ROLLBACK'], encoding='utf-8'))
+          target = json.load(open(os.environ['TARGET'], encoding='utf-8'))
+          assert rollback['schemaVersion'] == 1
+          assert rollback['environment'] == target['environment']
+          assert rollback['targetCompatibilityCommit'] == target['compatibility']['commit']
+          assert re.fullmatch(r'[0-9a-f]{40}', rollback['targetCompatibilityCommit'])
+          assert rollback['reason'].strip() and rollback['runbook'].strip()
+          PY

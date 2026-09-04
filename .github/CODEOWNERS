@@ -1,0 +1,5 @@
+* @Concertable/platform-maintainers
+
+/.github/workflows/ @Concertable/platform-maintainers
+/repository-settings/ @Concertable/platform-maintainers
+/renovate-config.json @Concertable/platform-maintainers

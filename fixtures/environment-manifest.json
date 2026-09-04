@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "environment": "test",
+  "compatibility": {"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "images": ["ghcr.io/concertable/auth:1.2.3@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+}

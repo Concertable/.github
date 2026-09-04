@@ -1,0 +1,115 @@
+name: Reusable OCI publication
+
+on:
+  workflow_call:
+    inputs:
+      image: {description: Fully qualified lowercase GHCR image name, required: true, type: string}
+      version: {description: Immutable release version or fixture identifier, required: true, type: string}
+      context: {required: false, default: ., type: string}
+      dockerfile: {required: false, default: Dockerfile, type: string}
+      publish: {description: Publish from an explicitly dispatched protected release ref, required: false, default: false, type: boolean}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oci-${{ inputs.image }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Build and scan exact image
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: read}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Validate immutable release version
+        env: {VERSION: "${{ inputs.version }}"}
+        run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]'
+      - name: Build local candidate archive
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          tags: ${{ inputs.image }}:${{ inputs.version }}
+          outputs: type=docker,dest=${{ runner.temp }}/image.tar
+          provenance: false
+          sbom: false
+      - name: Scan exact candidate archive
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          input: ${{ runner.temp }}/image.tar
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Produce candidate SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          input: ${{ runner.temp }}/image.tar
+          format: cyclonedx
+          output: ${{ runner.temp }}/sbom.cdx.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: verified-image
+          path: |
+            ${{ runner.temp }}/image.tar
+            ${{ runner.temp }}/sbom.cdx.json
+          if-no-files-found: error
+
+  publish:
+    name: Publish, sign, and attest verified image
+    needs: verify
+    if: ${{ inputs.publish && github.ref_protected && github.event_name == 'release' && github.ref_type == 'tag' && github.event.release.tag_name == format('v{0}', inputs.version) }}
+    runs-on: ubuntu-latest
+    environment: release
+    permissions: {contents: read, packages: write, id-token: write, attestations: write}
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with: {name: verified-image, path: "${{ runner.temp }}/verified-image"}
+      - name: Load verified image
+        run: docker load --input "$RUNNER_TEMP/verified-image/image.tar"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - name: Require unused immutable version tag
+        env:
+          IMAGE: ${{ inputs.image }}
+          TAG: ${{ inputs.version }}
+          REGISTRY_ACTOR: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repository="${IMAGE#ghcr.io/}"
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --retry 3 --retry-all-errors \
+            --user "$REGISTRY_ACTOR:$REGISTRY_TOKEN" \
+            --header 'Accept: application/vnd.oci.image.manifest.v1+json' \
+            "https://ghcr.io/v2/$repository/manifests/$TAG")"
+          if [[ "$status" == 200 ]]; then
+            echo "Refusing to move existing immutable tag $IMAGE:$TAG" >&2
+            exit 1
+          fi
+          if [[ "$status" != 404 ]]; then
+            echo "Registry could not prove $IMAGE:$TAG is unused (HTTP $status)" >&2
+            exit 1
+          fi
+      - name: Push verified image and resolve registry digest
+        id: push
+        env: {IMAGE: "${{ inputs.image }}", TAG: "${{ inputs.version }}"}
+        run: |
+          docker push "$IMAGE:$TAG"
+          digest="$(docker buildx imagetools inspect "$IMAGE:$TAG" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+      - name: Sign image by digest
+        env: {DIGEST: "${{ steps.push.outputs.digest }}", IMAGE: "${{ inputs.image }}"}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+      - name: Attach signed SBOM attestation
+        env: {DIGEST: "${{ steps.push.outputs.digest }}", IMAGE: "${{ inputs.image }}"}
+        run: cosign attest --yes --type cyclonedx --predicate "$RUNNER_TEMP/verified-image/sbom.cdx.json" "$IMAGE@$DIGEST"
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ${{ inputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

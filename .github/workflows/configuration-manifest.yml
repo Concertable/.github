@@ -1,0 +1,36 @@
+name: Reusable environment configuration validation
+
+on:
+  workflow_call:
+    inputs:
+      manifest: {required: true, type: string}
+      app-configuration: {required: true, type: string}
+
+permissions: {contents: read}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - name: Reject mutable images and embedded secrets
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+          APP_CONFIGURATION: ${{ inputs.app-configuration }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          desired = json.load(open(os.environ['MANIFEST'], encoding='utf-8'))
+          assert desired['schemaVersion'] == 1 and desired['environment'] in ('test', 'production')
+          assert re.fullmatch(r'[0-9a-f]{40}', desired['compatibility']['commit'])
+          image = r'ghcr\.io/concertable/[a-z0-9._/-]+:[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?@sha256:[0-9a-f]{64}'
+          assert desired['images'] and all(re.fullmatch(image, item) for item in desired['images'])
+          entries = json.load(open(os.environ['APP_CONFIGURATION'], encoding='utf-8'))
+          for entry in entries:
+              assert entry['key'] and (('value' in entry) ^ ('keyVaultReference' in entry))
+              if 'keyVaultReference' in entry:
+                  assert re.fullmatch(r'https://[a-z0-9-]+\.vault\.azure\.net/secrets/[A-Za-z0-9-]+(?:/[0-9a-f]+)?', entry['keyVaultReference'])
+              else:
+                  assert not re.search(r'(password|secret|token|connectionstring)', entry['key'], re.I)
+          PY

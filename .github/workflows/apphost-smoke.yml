@@ -1,0 +1,65 @@
+name: Reusable AppHost smoke
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: AppHost project to launch
+        required: true
+        type: string
+      health-url:
+        description: URL that must return a successful response
+        required: true
+        type: string
+      dotnet-version:
+        required: false
+        default: 10.0.x
+        type: string
+      timeout-seconds:
+        required: false
+        default: 180
+        type: number
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  smoke:
+    name: Boot AppHost
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          source-url: https://nuget.pkg.github.com/Concertable/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore and build
+        env:
+          PROJECT: ${{ inputs.project }}
+        run: |
+          dotnet restore "$PROJECT"
+          dotnet build "$PROJECT" --configuration Release --no-restore
+      - name: Launch and probe
+        env:
+          HEALTH_URL: ${{ inputs.health-url }}
+          PROJECT: ${{ inputs.project }}
+          TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        run: |
+          dotnet run --project "$PROJECT" --configuration Release --no-build --no-launch-profile &
+          apphost_pid=$!
+          trap 'kill "$apphost_pid" 2>/dev/null || true' EXIT
+          deadline=$((SECONDS + TIMEOUT_SECONDS))
+          until curl --fail --silent --show-error "$HEALTH_URL" >/dev/null; do
+            if ! kill -0 "$apphost_pid" 2>/dev/null; then
+              wait "$apphost_pid"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              echo "Timed out waiting for $HEALTH_URL" >&2
+              exit 1
+            fi
+            sleep 2
+          done
