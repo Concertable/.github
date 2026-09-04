@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const workflowsDirectory = new URL('../.github/workflows/', import.meta.url)
@@ -68,6 +70,14 @@ test('the complete durable owner-team roster is declared', () => {
   ])
 })
 
+test('settings verification handles reviewer shapes and paginated teams', () => {
+  const executable = process.platform === 'win32' ? 'powershell.exe' : 'pwsh'
+  const fixture = fileURLToPath(new URL('./repository-settings.test.ps1', import.meta.url))
+  const executionPolicy = process.platform === 'win32' ? ['-ExecutionPolicy', 'Bypass'] : []
+  const result = spawnSync(executable, ['-NoProfile', '-NonInteractive', ...executionPolicy, '-File', fixture], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+})
+
 test('Renovate sees package versions and image digests in both manifest owners', () => {
   const config = JSON.parse(readFileSync(new URL('../renovate-config.json', import.meta.url), 'utf8'))
   const compatibility = readFileSync(new URL('../fixtures/compatibility-manifest.json', import.meta.url), 'utf8')
@@ -86,8 +96,8 @@ test('Renovate sees package versions and image digests in both manifest owners',
 test('publication authority is isolated from caller build code', () => {
   for (const name of ['nuget-publish.yml', 'npm-publish.yml', 'container-publish.yml']) {
     const workflow = readFileSync(new URL(name, workflowsDirectory), 'utf8')
-    assert.match(workflow, /^\s{2}verify:\n(?:.|\n)*?permissions: \{contents: read, packages: read\}/m)
-    assert.match(workflow, /^\s{2}publish:\n(?:.|\n)*?environment: release\n\s+permissions: \{contents: read, packages: write, id-token: write, attestations: write\}/m)
+    assert.match(workflow, /^\s{2}verify:\r?\n[\s\S]*?permissions: \{contents: read, packages: read\}/m)
+    assert.match(workflow, /^\s{2}publish:\r?\n[\s\S]*?environment: release\r?\n\s+permissions: \{contents: read, packages: write, id-token: write, attestations: write\}/m)
     assert.match(workflow, /inputs\.publish && github\.ref_protected/)
   }
 })

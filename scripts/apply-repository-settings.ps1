@@ -12,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $organization, $repositoryName = $Repository -split '/', 2
 $teams = Get-Content -LiteralPath (Join-Path $root 'repository-settings/teams.json') -Raw | ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'repository-settings-functions.ps1')
 
 function Assert-TemplateEqual {
     param([object] $Expected, [object] $Actual, [string] $Path)
@@ -88,17 +89,12 @@ if (-not $WhatIfPreference) {
     }
 
     $actualEnvironment = gh api "repos/$Repository/environments/release" | ConvertFrom-Json
-    $waitRule = $actualEnvironment.protection_rules | Where-Object type -eq 'wait_timer'
-    $reviewRule = $actualEnvironment.protection_rules | Where-Object type -eq 'required_reviewers'
-    $actualEnvironmentInput = [pscustomobject]@{
-        wait_timer = if ($waitRule) { $waitRule.wait_timer } else { 0 }
-        reviewers = @($reviewRule.reviewers | ForEach-Object { [pscustomobject]@{ type = $_.reviewer.type; id = $_.reviewer.id } })
-        deployment_branch_policy = $actualEnvironment.deployment_branch_policy
-    }
+    $actualEnvironmentInput = ConvertTo-EnvironmentPolicyInput -Environment $actualEnvironment
     Assert-TemplateEqual ($environment | ConvertFrom-Json) $actualEnvironmentInput 'environment'
 
-    $permission = gh api "orgs/$organization/teams/$OwnerTeamSlug/repos/$organization/$repositoryName" | ConvertFrom-Json
-    if ($permission.role_name -ne 'maintain' -and $permission.permissions.maintain -ne $true) {
+    $teamPages = gh api --paginate --slurp "repos/$Repository/teams?per_page=100" | ConvertFrom-Json
+    $permission = Find-RepositoryTeamPermission -TeamPages $teamPages -Slug $OwnerTeamSlug
+    if (-not $permission -or ($permission.permission -ne 'maintain' -and $permission.permissions.maintain -ne $true)) {
         throw "Owner team does not have maintain permission on $Repository."
     }
 }
