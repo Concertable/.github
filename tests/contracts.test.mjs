@@ -40,6 +40,7 @@ test('policy templates and Renovate preset are valid JSON', () => {
   for (const path of [
     '../renovate-config.json',
     '../repository-settings/rulesets/main.json',
+    '../repository-settings/rulesets/release-tags.json',
     '../repository-settings/environments/release.json',
     '../repository-settings/teams.json',
   ]) {

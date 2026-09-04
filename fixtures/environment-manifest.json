@@ -2,7 +2,5 @@
   "schemaVersion": 1,
   "environment": "test",
   "compatibility": {"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-  "images": [
-    {"name": "ghcr.io/concertable/auth", "tag": "1.2.3", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-  ]
+  "images": ["ghcr.io/concertable/auth:1.2.3@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
 }

@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: oci-${{ inputs.image }}-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     name: Build and scan exact image
@@ -21,6 +25,9 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: {persist-credentials: false}
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Validate immutable release version
+        env: {VERSION: "${{ inputs.version }}"}
+        run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]'
       - name: Build local candidate archive
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -54,7 +61,7 @@ jobs:
   publish:
     name: Publish, sign, and attest verified image
     needs: verify
-    if: ${{ inputs.publish && github.ref_protected && (github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
+    if: ${{ inputs.publish && github.ref_protected && github.event_name == 'release' && github.ref_type == 'tag' && github.event.release.tag_name == format('v{0}', inputs.version) }}
     runs-on: ubuntu-latest
     environment: release
     permissions: {contents: read, packages: write, id-token: write, attestations: write}
@@ -65,6 +72,9 @@ jobs:
         run: docker load --input "$RUNNER_TEMP/verified-image/image.tar"
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - name: Require unused immutable version tag
+        env: {IMAGE: "${{ inputs.image }}", TAG: "${{ inputs.version }}"}
+        run: '! docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1'
       - name: Push verified image and resolve registry digest
         id: push
         env: {IMAGE: "${{ inputs.image }}", TAG: "${{ inputs.version }}"}

@@ -4,10 +4,6 @@
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "runUrl": "https://github.com/Concertable/system/actions/runs/1"
   },
-  "images": [
-    {"name": "ghcr.io/concertable/auth", "tag": "1.2.3", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-  ],
-  "packages": [
-    {"datasource": "nuget", "name": "Concertable.Auth.Contracts", "version": "1.2.3"}
-  ]
+  "images": ["ghcr.io/concertable/auth:1.2.3@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+  "packages": ["nuget:Concertable.Auth.Contracts@1.2.3"]
 }

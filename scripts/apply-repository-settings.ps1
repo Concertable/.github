@@ -66,22 +66,26 @@ if ($PSCmdlet.ShouldProcess("$Repository/release", 'Apply release environment po
     $environment | gh api --method PUT "repos/$Repository/environments/release" --input - | Out-Null
 }
 
-$rulesetPath = Join-Path $root 'repository-settings/rulesets/main.json'
-$ruleset = Get-Content -LiteralPath $rulesetPath -Raw
-$rulesets = gh api "repos/$Repository/rulesets" | ConvertFrom-Json
-$existingRuleset = $rulesets | Where-Object name -eq 'Main merge queue' | Select-Object -First 1
-$method = if ($existingRuleset) { 'PUT' } else { 'POST' }
-$endpoint = if ($existingRuleset) { "repos/$Repository/rulesets/$($existingRuleset.id)" } else { "repos/$Repository/rulesets" }
-if ($PSCmdlet.ShouldProcess("$Repository/Main merge queue", "$method ruleset")) {
-    $ruleset | gh api --method $method $endpoint --input - | Out-Null
+$rulesetTemplates = Get-ChildItem -LiteralPath (Join-Path $root 'repository-settings/rulesets') -Filter '*.json' | ForEach-Object {
+    Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+}
+foreach ($rulesetTemplate in $rulesetTemplates) {
+    $rulesets = gh api "repos/$Repository/rulesets" | ConvertFrom-Json
+    $existingRuleset = $rulesets | Where-Object name -eq $rulesetTemplate.name | Select-Object -First 1
+    $method = if ($existingRuleset) { 'PUT' } else { 'POST' }
+    $endpoint = if ($existingRuleset) { "repos/$Repository/rulesets/$($existingRuleset.id)" } else { "repos/$Repository/rulesets" }
+    if ($PSCmdlet.ShouldProcess("$Repository/$($rulesetTemplate.name)", "$method ruleset")) {
+        $rulesetTemplate | ConvertTo-Json -Depth 20 -Compress | gh api --method $method $endpoint --input - | Out-Null
+    }
 }
 
 if (-not $WhatIfPreference) {
-    $appliedRuleset = gh api "repos/$Repository/rulesets" | ConvertFrom-Json | Where-Object name -eq 'Main merge queue'
-    if (-not $appliedRuleset) { throw 'Main merge queue ruleset was not returned after application.' }
-    $actualRuleset = gh api "repos/$Repository/rulesets/$($appliedRuleset.id)" | ConvertFrom-Json
-    $expectedRuleset = $ruleset | ConvertFrom-Json
-    Assert-TemplateEqual $expectedRuleset $actualRuleset 'ruleset'
+    foreach ($expectedRuleset in $rulesetTemplates) {
+        $appliedRuleset = gh api "repos/$Repository/rulesets" | ConvertFrom-Json | Where-Object name -eq $expectedRuleset.name
+        if (-not $appliedRuleset) { throw "Ruleset '$($expectedRuleset.name)' was not returned after application." }
+        $actualRuleset = gh api "repos/$Repository/rulesets/$($appliedRuleset.id)" | ConvertFrom-Json
+        Assert-TemplateEqual $expectedRuleset $actualRuleset "ruleset[$($expectedRuleset.name)]"
+    }
 
     $actualEnvironment = gh api "repos/$Repository/environments/release" | ConvertFrom-Json
     $waitRule = $actualEnvironment.protection_rules | Where-Object type -eq 'wait_timer'
