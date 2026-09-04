@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Concertable organization dependency policy",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "configMigration": true,
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Keep GitHub Actions immutable",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "groupName": "github actions"
+    },
+    {
+      "description": "Group Concertable package trains by ecosystem",
+      "matchPackageNames": ["/^Concertable\\./", "/^@concertable\\//"],
+      "groupName": "concertable packages"
+    },
+    {
+      "description": "Never automerge breaking dependency updates",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "dependencyDashboardApproval": true
+    }
+  ]
+}

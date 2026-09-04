@@ -1,0 +1,72 @@
+name: Reusable npm publication
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: false
+        default: .
+        type: string
+      node-version:
+        required: false
+        default: '22'
+        type: string
+      publish:
+        description: Publish after packing and clean-consumer verification
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  package:
+    name: Pack, verify, and publish
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: '@concertable'
+      - name: Install and test
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm ci
+          npm test
+      - name: Pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/packages"
+          npm pack --pack-destination "$RUNNER_TEMP/packages"
+      - name: Verify packed consumer install
+        run: |
+          mkdir "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init --yes
+          npm install "$RUNNER_TEMP"/packages/*.tgz --ignore-scripts
+      - name: Attest package
+        if: ${{ inputs.publish }}
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ runner.temp }}/packages/*.tgz
+      - name: Publish
+        if: ${{ inputs.publish }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish "$RUNNER_TEMP"/packages/*.tgz --registry https://npm.pkg.github.com --provenance
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/packages/*.tgz
+          if-no-files-found: error

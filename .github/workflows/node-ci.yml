@@ -1,0 +1,62 @@
+name: Reusable Node CI
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: false
+        default: .
+        type: string
+      node-version:
+        required: false
+        default: '22'
+        type: string
+      run-lint:
+        required: false
+        default: true
+        type: boolean
+      run-typecheck:
+        required: false
+        default: true
+        type: boolean
+      run-tests:
+        required: false
+        default: true
+        type: boolean
+      run-build:
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  verify:
+    name: Install and verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: '@concertable'
+      - name: Install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm ci
+      - if: ${{ inputs.run-lint }}
+        run: npm run lint
+      - if: ${{ inputs.run-typecheck }}
+        run: npm run typecheck
+      - if: ${{ inputs.run-tests }}
+        run: npm run test
+      - if: ${{ inputs.run-build }}
+        run: npm run build

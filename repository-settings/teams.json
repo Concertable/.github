@@ -1,0 +1,10 @@
+[
+  {"name": "Auth maintainers", "slug": "auth-maintainers", "privacy": "closed"},
+  {"name": "B2B maintainers", "slug": "b2b-maintainers", "privacy": "closed"},
+  {"name": "Customer maintainers", "slug": "customer-maintainers", "privacy": "closed"},
+  {"name": "Frontend platform maintainers", "slug": "frontend-platform-maintainers", "privacy": "closed"},
+  {"name": "Payment maintainers", "slug": "payment-maintainers", "privacy": "closed"},
+  {"name": "Platform maintainers", "slug": "platform-maintainers", "privacy": "closed"},
+  {"name": "Search maintainers", "slug": "search-maintainers", "privacy": "closed"},
+  {"name": "System maintainers", "slug": "system-maintainers", "privacy": "closed"}
+]

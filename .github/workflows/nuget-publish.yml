@@ -1,0 +1,107 @@
+name: Reusable NuGet publication
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Project or solution to pack
+        required: true
+        type: string
+      dotnet-version:
+        required: false
+        default: 10.0.x
+        type: string
+      configuration:
+        required: false
+        default: Release
+        type: string
+      publish:
+        description: Push packages after verification
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  package:
+    name: Pack, attest, and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          source-url: https://nuget.pkg.github.com/Concertable/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pack
+        env:
+          CONFIGURATION: ${{ inputs.configuration }}
+          PROJECT: ${{ inputs.project }}
+        run: dotnet pack "$PROJECT" --configuration "$CONFIGURATION" --output "$RUNNER_TEMP/packages"
+      - name: Require packages
+        run: compgen -G "$RUNNER_TEMP/packages/*.nupkg" >/dev/null
+      - name: Verify clean consumer
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir "$RUNNER_TEMP/consumer"
+          python - "$RUNNER_TEMP/packages" "$RUNNER_TEMP/consumer/Consumer.csproj" <<'PY'
+          import pathlib
+          import sys
+          import xml.etree.ElementTree as ET
+          import zipfile
+
+          package_directory = pathlib.Path(sys.argv[1])
+          references = []
+          for package_path in sorted(package_directory.glob('*.nupkg')):
+              if package_path.name.endswith('.symbols.nupkg'):
+                  continue
+              with zipfile.ZipFile(package_path) as package:
+                  manifest_name = next(name for name in package.namelist() if name.endswith('.nuspec'))
+                  metadata = ET.fromstring(package.read(manifest_name)).find('{*}metadata')
+                  references.append((metadata.findtext('{*}id'), metadata.findtext('{*}version')))
+
+          if not references:
+              raise SystemExit('No consumer packages found')
+
+          items = '\n'.join(
+              f'    <PackageReference Include="{package_id}" Version="{version}" />'
+              for package_id, version in references
+          )
+          project = f'''<Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+            <ItemGroup>
+          {items}
+            </ItemGroup>
+          </Project>
+          '''
+          pathlib.Path(sys.argv[2]).write_text(project, encoding='utf-8')
+          PY
+          dotnet new nugetconfig --output "$RUNNER_TEMP/consumer" --force
+          dotnet nuget add source "$RUNNER_TEMP/packages" --name candidate --configfile "$RUNNER_TEMP/consumer/NuGet.config"
+          dotnet nuget add source https://nuget.pkg.github.com/Concertable/index.json --name github --username Concertable --password "$NUGET_AUTH_TOKEN" --store-password-in-clear-text --configfile "$RUNNER_TEMP/consumer/NuGet.config"
+          dotnet restore "$RUNNER_TEMP/consumer/Consumer.csproj" --configfile "$RUNNER_TEMP/consumer/NuGet.config" --packages "$RUNNER_TEMP/consumer/packages"
+          dotnet build "$RUNNER_TEMP/consumer/Consumer.csproj" --configuration Release --no-restore
+      - name: Attest packages
+        if: ${{ inputs.publish }}
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ runner.temp }}/packages/*.nupkg
+      - name: Publish
+        if: ${{ inputs.publish }}
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet nuget push "$RUNNER_TEMP/packages/*.nupkg" --api-key "$NUGET_AUTH_TOKEN" --source https://nuget.pkg.github.com/Concertable/index.json --skip-duplicate
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nuget-packages
+          path: ${{ runner.temp }}/packages/*.nupkg
+          if-no-files-found: error
