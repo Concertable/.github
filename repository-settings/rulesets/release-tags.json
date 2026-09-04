@@ -9,7 +9,6 @@
     }
   },
   "rules": [
-    {"type": "creation"},
     {"type": "update"},
     {"type": "deletion"}
   ],

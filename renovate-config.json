@@ -9,7 +9,7 @@
       "customType": "regex",
       "description": "Packages in system compatibility manifests",
       "managerFilePatterns": ["/(^|/)compatibility[-/].*\\.json$/", "/(^|/)compatibility-manifest\\.json$/"],
-      "matchStrings": ["\"(?<datasource>nuget|npm):(?<depName>[^\"@]+)@(?<currentValue>[^\"@]+)\""],
+      "matchStrings": ["\"(?<datasource>nuget|npm):(?<depName>(?:@[^/\"@]+/)?[^\"@]+)@(?<currentValue>[^\"@]+)\""],
       "versioningTemplate": "{{#if (equals datasource 'nuget')}}nuget{{else}}npm{{/if}}"
     },
     {

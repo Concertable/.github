@@ -5,5 +5,8 @@
     "runUrl": "https://github.com/Concertable/system/actions/runs/1"
   },
   "images": ["ghcr.io/concertable/auth:1.2.3@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
-  "packages": ["nuget:Concertable.Auth.Contracts@1.2.3"]
+  "packages": [
+    "nuget:Concertable.Auth.Contracts@1.2.3",
+    "npm:@concertable/shared@1.2.3"
+  ]
 }
