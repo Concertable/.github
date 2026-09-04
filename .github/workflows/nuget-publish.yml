@@ -52,11 +52,11 @@ jobs:
           ET.ElementTree(root).write(sys.argv[2], encoding='utf-8', xml_declaration=True)
           PY
           dotnet new nugetconfig --output "$RUNNER_TEMP/consumer" --force
-          dotnet nuget add source "$RUNNER_TEMP/packages" --name candidate --configfile "$RUNNER_TEMP/consumer/NuGet.config"
-          dotnet nuget add source https://nuget.pkg.github.com/Concertable/index.json --name github --username Concertable --password "$NUGET_AUTH_TOKEN" --store-password-in-clear-text --configfile "$RUNNER_TEMP/consumer/NuGet.config"
-          dotnet restore "$RUNNER_TEMP/consumer/Consumer.csproj" --configfile "$RUNNER_TEMP/consumer/NuGet.config" --packages "$RUNNER_TEMP/consumer/packages"
+          dotnet nuget add source "$RUNNER_TEMP/packages" --name candidate --configfile "$RUNNER_TEMP/consumer/nuget.config"
+          dotnet nuget add source https://nuget.pkg.github.com/Concertable/index.json --name github --username Concertable --password "$NUGET_AUTH_TOKEN" --store-password-in-clear-text --configfile "$RUNNER_TEMP/consumer/nuget.config"
+          dotnet restore "$RUNNER_TEMP/consumer/Consumer.csproj" --configfile "$RUNNER_TEMP/consumer/nuget.config" --packages "$RUNNER_TEMP/consumer/packages"
           dotnet build "$RUNNER_TEMP/consumer/Consumer.csproj" --configuration Release --no-restore
-          rm -f "$RUNNER_TEMP/consumer/NuGet.config"
+          rm -f "$RUNNER_TEMP/consumer/nuget.config"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: nuget-packages, path: "${{ runner.temp }}/packages/*.nupkg", if-no-files-found: error}
 
