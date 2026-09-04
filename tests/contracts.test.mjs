@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const workflowsDirectory = new URL('../.github/workflows/', import.meta.url)
@@ -68,11 +70,12 @@ test('the complete durable owner-team roster is declared', () => {
   ])
 })
 
-test('settings verification preserves an empty environment reviewer array', () => {
-  const script = readFileSync(new URL('../scripts/apply-repository-settings.ps1', import.meta.url), 'utf8')
-  assert.match(script, /reviewers = @\(\s*if \(\$reviewRule\)/)
-  assert.match(script, /gh api "repos\/\$Repository\/teams"/)
-  assert.match(script, /\$permission\.permission -ne 'maintain'/)
+test('settings verification handles reviewer shapes and paginated teams', () => {
+  const executable = process.platform === 'win32' ? 'powershell.exe' : 'pwsh'
+  const fixture = fileURLToPath(new URL('./repository-settings.test.ps1', import.meta.url))
+  const executionPolicy = process.platform === 'win32' ? ['-ExecutionPolicy', 'Bypass'] : []
+  const result = spawnSync(executable, ['-NoProfile', '-NonInteractive', ...executionPolicy, '-File', fixture], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr || result.stdout)
 })
 
 test('Renovate sees package versions and image digests in both manifest owners', () => {
