@@ -74,7 +74,11 @@ test('Renovate sees package versions and image digests in both manifest owners',
   const environment = readFileSync(new URL('../fixtures/environment-manifest.json', import.meta.url), 'utf8')
   assert.equal(config.customManagers.length, 2)
   assert.ok(config.customManagers.every(({managerFilePatterns}) => managerFilePatterns.some((pattern) => pattern.includes('manifest'))))
-  assert.match(compatibility, new RegExp(config.customManagers[0].matchStrings[0]))
+  const packageMatches = [...compatibility.matchAll(new RegExp(config.customManagers[0].matchStrings[0], 'g'))]
+  assert.deepEqual(packageMatches.map(({groups}) => [groups.datasource, groups.depName, groups.currentValue]), [
+    ['nuget', 'Concertable.Auth.Contracts', '1.2.3'],
+    ['npm', '@concertable/shared', '1.2.3'],
+  ])
   assert.match(compatibility, new RegExp(config.customManagers[1].matchStrings[0]))
   assert.match(environment, new RegExp(config.customManagers[1].matchStrings[0]))
 })
