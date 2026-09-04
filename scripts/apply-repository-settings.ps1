@@ -92,13 +92,21 @@ if (-not $WhatIfPreference) {
     $reviewRule = $actualEnvironment.protection_rules | Where-Object type -eq 'required_reviewers'
     $actualEnvironmentInput = [pscustomobject]@{
         wait_timer = if ($waitRule) { $waitRule.wait_timer } else { 0 }
-        reviewers = @($reviewRule.reviewers | ForEach-Object { [pscustomobject]@{ type = $_.reviewer.type; id = $_.reviewer.id } })
+        reviewers = @(
+            if ($reviewRule) {
+                $reviewRule.reviewers | ForEach-Object {
+                    [pscustomobject]@{ type = $_.reviewer.type; id = $_.reviewer.id }
+                }
+            }
+        )
         deployment_branch_policy = $actualEnvironment.deployment_branch_policy
     }
     Assert-TemplateEqual ($environment | ConvertFrom-Json) $actualEnvironmentInput 'environment'
 
-    $permission = gh api "orgs/$organization/teams/$OwnerTeamSlug/repos/$organization/$repositoryName" | ConvertFrom-Json
-    if ($permission.role_name -ne 'maintain' -and $permission.permissions.maintain -ne $true) {
+    $permission = gh api "repos/$Repository/teams" | ConvertFrom-Json |
+        Where-Object slug -eq $OwnerTeamSlug |
+        Select-Object -First 1
+    if (-not $permission -or ($permission.permission -ne 'maintain' -and $permission.permissions.maintain -ne $true)) {
         throw "Owner team does not have maintain permission on $Repository."
     }
 }

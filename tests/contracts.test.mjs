@@ -68,6 +68,13 @@ test('the complete durable owner-team roster is declared', () => {
   ])
 })
 
+test('settings verification preserves an empty environment reviewer array', () => {
+  const script = readFileSync(new URL('../scripts/apply-repository-settings.ps1', import.meta.url), 'utf8')
+  assert.match(script, /reviewers = @\(\s*if \(\$reviewRule\)/)
+  assert.match(script, /gh api "repos\/\$Repository\/teams"/)
+  assert.match(script, /\$permission\.permission -ne 'maintain'/)
+})
+
 test('Renovate sees package versions and image digests in both manifest owners', () => {
   const config = JSON.parse(readFileSync(new URL('../renovate-config.json', import.meta.url), 'utf8'))
   const compatibility = readFileSync(new URL('../fixtures/compatibility-manifest.json', import.meta.url), 'utf8')
@@ -86,8 +93,8 @@ test('Renovate sees package versions and image digests in both manifest owners',
 test('publication authority is isolated from caller build code', () => {
   for (const name of ['nuget-publish.yml', 'npm-publish.yml', 'container-publish.yml']) {
     const workflow = readFileSync(new URL(name, workflowsDirectory), 'utf8')
-    assert.match(workflow, /^\s{2}verify:\n(?:.|\n)*?permissions: \{contents: read, packages: read\}/m)
-    assert.match(workflow, /^\s{2}publish:\n(?:.|\n)*?environment: release\n\s+permissions: \{contents: read, packages: write, id-token: write, attestations: write\}/m)
+    assert.match(workflow, /^\s{2}verify:\r?\n[\s\S]*?permissions: \{contents: read, packages: read\}/m)
+    assert.match(workflow, /^\s{2}publish:\r?\n[\s\S]*?environment: release\r?\n\s+permissions: \{contents: read, packages: write, id-token: write, attestations: write\}/m)
     assert.match(workflow, /inputs\.publish && github\.ref_protected/)
   }
 })
