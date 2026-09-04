@@ -1,0 +1,32 @@
+name: Reusable compatibility manifest validation
+
+on:
+  workflow_call:
+    inputs:
+      manifest: {required: true, type: string}
+
+permissions: {contents: read}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - name: Require immutable, qualified dependencies
+        env: {MANIFEST: "${{ inputs.manifest }}"}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          data = json.load(open(os.environ['MANIFEST'], encoding='utf-8'))
+          assert data['schemaVersion'] == 1
+          evidence = data['qualification']
+          assert re.fullmatch(r'[0-9a-f]{40}', evidence['commit'])
+          assert evidence['runUrl'].startswith('https://github.com/Concertable/')
+          assert data['images'] and data['packages']
+          for item in data['images']:
+              assert item['name'].startswith('ghcr.io/concertable/')
+              assert re.fullmatch(r'sha256:[0-9a-f]{64}', item['digest'])
+          for item in data['packages']:
+              assert item['datasource'] in ('nuget', 'npm') and item['name'] and item['version']
+          PY

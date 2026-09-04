@@ -3,35 +3,23 @@ name: Reusable npm publication
 on:
   workflow_call:
     inputs:
-      working-directory:
-        required: false
-        default: .
-        type: string
-      node-version:
-        required: false
-        default: '22'
-        type: string
-      publish:
-        description: Publish after packing and clean-consumer verification
-        required: false
-        default: false
-        type: boolean
+      working-directory: {required: false, default: ., type: string}
+      node-version: {required: false, default: '22', type: string}
+      publish: {description: Publish from an explicitly dispatched protected release ref, required: false, default: false, type: boolean}
 
 permissions:
   contents: read
-  packages: write
-  id-token: write
-  attestations: write
 
 jobs:
-  package:
-    name: Pack, verify, and publish
+  verify:
+    name: Pack and verify
     runs-on: ubuntu-latest
+    permissions: {contents: read, packages: read}
     defaults:
-      run:
-        working-directory: ${{ inputs.working-directory }}
+      run: {working-directory: "${{ inputs.working-directory }}"}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ inputs.node-version }}
@@ -40,33 +28,39 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@concertable'
       - name: Install and test
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: {NODE_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
         run: |
           npm ci
           npm test
       - name: Pack
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
-          npm pack --pack-destination "$RUNNER_TEMP/packages"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/packages"
       - name: Verify packed consumer install
+        env: {NODE_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
         run: |
           mkdir "$RUNNER_TEMP/consumer"
           cd "$RUNNER_TEMP/consumer"
           npm init --yes
+          npm config set @concertable:registry https://npm.pkg.github.com
           npm install "$RUNNER_TEMP"/packages/*.tgz --ignore-scripts
-      - name: Attest package
-        if: ${{ inputs.publish }}
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
-        with:
-          subject-path: ${{ runner.temp }}/packages/*.tgz
-      - name: Publish
-        if: ${{ inputs.publish }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm publish "$RUNNER_TEMP"/packages/*.tgz --registry https://npm.pkg.github.com --provenance
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: npm-package
-          path: ${{ runner.temp }}/packages/*.tgz
-          if-no-files-found: error
+        with: {name: npm-package, path: "${{ runner.temp }}/packages/*.tgz", if-no-files-found: error}
+
+  publish:
+    name: Attest and publish
+    needs: verify
+    if: ${{ inputs.publish && github.ref_protected && (github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
+    runs-on: ubuntu-latest
+    environment: release
+    permissions: {contents: read, packages: write, id-token: write, attestations: write}
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with: {name: npm-package, path: "${{ runner.temp }}/packages"}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: "${{ inputs.node-version }}", registry-url: https://npm.pkg.github.com, scope: '@concertable'}
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with: {subject-path: "${{ runner.temp }}/packages/*.tgz"}
+      - name: Publish transferred package without lifecycle scripts
+        env: {NODE_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+        run: npm publish "$RUNNER_TEMP"/packages/*.tgz --ignore-scripts --registry https://npm.pkg.github.com --provenance

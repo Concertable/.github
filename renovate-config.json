@@ -4,6 +4,23 @@
   "extends": ["config:recommended", ":dependencyDashboard"],
   "configMigration": true,
   "minimumReleaseAge": "3 days",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Packages in system compatibility manifests",
+      "managerFilePatterns": ["/(^|/)compatibility[-/].*\\.json$/", "/(^|/)compatibility-manifest\\.json$/"],
+      "matchStrings": ["\\{\\s*\"datasource\"\\s*:\\s*\"(?<datasource>nuget|npm)\"\\s*,\\s*\"name\"\\s*:\\s*\"(?<depName>[^\"]+)\"\\s*,\\s*\"version\"\\s*:\\s*\"(?<currentValue>[^\"]+)\"\\s*\\}"],
+      "versioningTemplate": "{{#if (equals datasource 'nuget')}}nuget{{else}}npm{{/if}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Images in compatibility and environment manifests",
+      "managerFilePatterns": ["/(^|/)(compatibility|environments?)[-/].*\\.json$/", "/(^|/)(compatibility|environment)-manifest\\.json$/"],
+      "matchStrings": ["\\{\\s*\"name\"\\s*:\\s*\"(?<depName>ghcr\\.io/concertable/[^\"]+)\"\\s*,\\s*\"digest\"\\s*:\\s*\"(?<currentDigest>sha256:[0-9a-f]{64})\"\\s*\\}"],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
       "description": "Keep GitHub Actions immutable",
@@ -12,9 +29,46 @@
       "groupName": "github actions"
     },
     {
-      "description": "Group Concertable package trains by ecosystem",
-      "matchPackageNames": ["/^Concertable\\./", "/^@concertable\\//"],
-      "groupName": "concertable packages"
+      "description": "Auth producer train",
+      "matchDatasources": ["nuget"],
+      "matchPackageNames": ["/^Concertable\\.Auth(?:\\.|$)/"],
+      "groupName": "auth train"
+    },
+    {
+      "description": "B2B producer train",
+      "matchDatasources": ["nuget", "npm"],
+      "matchPackageNames": ["/^Concertable\\.B2B(?:\\.|$)/", "/^@concertable\\/b2b(?:-|$)/"],
+      "groupName": "b2b train"
+    },
+    {
+      "description": "Customer producer train",
+      "matchDatasources": ["nuget", "npm"],
+      "matchPackageNames": ["/^Concertable\\.Customer(?:\\.|$)/", "/^@concertable\\/customer(?:-|$)/"],
+      "groupName": "customer train"
+    },
+    {
+      "description": "Payment producer train",
+      "matchDatasources": ["nuget"],
+      "matchPackageNames": ["/^Concertable\\.Payment(?:\\.|$)/"],
+      "groupName": "payment train"
+    },
+    {
+      "description": "Search producer train",
+      "matchDatasources": ["nuget"],
+      "matchPackageNames": ["/^Concertable\\.Search(?:\\.|$)/"],
+      "groupName": "search train"
+    },
+    {
+      "description": "Shared dotnet platform train",
+      "matchDatasources": ["nuget"],
+      "matchPackageNames": ["/^Concertable\\.(?!Auth|B2B|Customer|Payment|Search)/"],
+      "groupName": "platform dotnet train"
+    },
+    {
+      "description": "Shared web platform train",
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["/^@concertable\\/(shared|web-shared)$/"],
+      "groupName": "platform web train"
     },
     {
       "description": "Never automerge breaking dependency updates",

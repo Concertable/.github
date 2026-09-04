@@ -3,36 +3,78 @@ name: Reusable Terraform CI
 on:
   workflow_call:
     inputs:
-      working-directory:
-        required: false
-        default: .
-        type: string
-      terraform-version:
-        required: false
-        default: 1.13.1
-        type: string
-      run-plan:
-        required: false
-        default: false
-        type: boolean
+      working-directory: {required: false, default: ., type: string}
+      terraform-version: {required: false, default: 1.13.1, type: string}
+      run-plan: {required: false, default: false, type: boolean}
+      apply: {description: Apply the saved plan from a protected explicit dispatch, required: false, default: false, type: boolean}
+      environment: {required: false, default: test, type: string}
+    secrets:
+      AZURE_CLIENT_ID: {required: false}
+      AZURE_TENANT_ID: {required: false}
+      AZURE_SUBSCRIPTION_ID: {required: false}
 
 permissions:
   contents: read
 
 jobs:
   validate:
-    name: Format, validate, and plan
+    name: Format and validate
     runs-on: ubuntu-latest
     defaults:
-      run:
-        working-directory: ${{ inputs.working-directory }}
+      run: {working-directory: "${{ inputs.working-directory }}"}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-        with:
-          terraform_version: ${{ inputs.terraform-version }}
+        with: {terraform_version: "${{ inputs.terraform-version }}"}
       - run: terraform fmt -check -recursive
       - run: terraform init -backend=false -input=false
       - run: terraform validate
-      - if: ${{ inputs.run-plan }}
-        run: terraform plan -input=false -lock=false
+
+  plan:
+    name: Plan protected infrastructure change
+    needs: validate
+    if: ${{ inputs.run-plan && github.ref_protected && (github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions: {contents: read, id-token: write}
+    defaults:
+      run: {working-directory: "${{ inputs.working-directory }}"}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: {terraform_version: "${{ inputs.terraform-version }}"}
+      - run: terraform init -input=false
+      - run: terraform plan -input=false -out=tfplan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: terraform-plan, path: "${{ inputs.working-directory }}/tfplan", if-no-files-found: error}
+
+  apply:
+    name: Apply reviewed Terraform plan
+    needs: plan
+    if: ${{ inputs.apply && github.ref_protected && (github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions: {contents: read, id-token: write}
+    defaults:
+      run: {working-directory: "${{ inputs.working-directory }}"}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: {terraform_version: "${{ inputs.terraform-version }}"}
+      - run: terraform init -input=false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with: {name: terraform-plan, path: "${{ inputs.working-directory }}"}
+      - run: terraform apply -input=false tfplan

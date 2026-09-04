@@ -15,9 +15,11 @@ jobs:
 ```
 
 The caller owns triggers, path selection, service-specific validation, environments, and the final
-`ci-complete` aggregation job. Publication callers pass `publish: false` in pull requests and may set it to
-`true` only from their protected release flow. The reusable workflow declares the maximum permissions it
-needs; callers should grant only those permissions for the selected mode.
+`ci-complete` aggregation job. Every required caller handles both `pull_request` and `merge_group`, and the
+aggregation job's displayed `name` is exactly `ci-complete`; the shared ruleset relies on that check context.
+Publication callers pass `publish: false` in pull requests and may set it to `true` only from an explicit
+dispatch or release on a protected ref. Verification jobs remain read-only; release environments guard the
+separately privileged publication jobs.
 
 Available contracts:
 
@@ -28,7 +30,16 @@ Available contracts:
 - `container-publish.yml`: BuildKit build, critical-vulnerability scan, SBOM/provenance, keyless signing, and optional GHCR push.
 - `apphost-smoke.yml`: restore/build an AppHost and require a health endpoint before timeout.
 - `terraform-ci.yml`: recursive formatting, backend-free initialization, validation, and optional plan.
+- `compatibility-manifest.yml`: immutable service-image/package set and system-qualification evidence.
+- `configuration-manifest.yml`: environment image pins, non-secret App Configuration values, and Key Vault references.
+- `configuration-promotion.yml`: compatibility evidence, rollout order, and rollback linkage.
+- `configuration-rollback.yml`: immutable last-known-good target and operator/runbook evidence.
 
-`repository-settings/` contains API payload templates. Apply them only after substituting repository-specific
-reviewers, environments, and required checks, then compare the returned GitHub object with the intended
-payload. The templates contain no secret values.
+`repository-settings/` contains declarative templates, not raw endpoint payloads. Run
+`pwsh scripts/apply-repository-settings.ps1 -Repository Concertable/<name>` to create/update teams, grant the
+declared owner team, create the release environment, and replace the main ruleset after resolving live team
+and repository IDs. The script strips derived team slugs from create requests and verifies the returned
+objects. Templates contain no secret values.
+
+The accepted manifest shapes are documented in [MANIFEST_CONTRACTS.md](MANIFEST_CONTRACTS.md). They deliberately
+record dependency names and immutable digests/versions in a Renovate-readable form.

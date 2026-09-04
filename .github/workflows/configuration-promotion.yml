@@ -1,0 +1,31 @@
+name: Reusable promotion validation
+
+on:
+  workflow_call:
+    inputs:
+      promotion: {required: true, type: string}
+      compatibility-manifest: {required: true, type: string}
+
+permissions: {contents: read}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {persist-credentials: false}
+      - name: Require system qualification and explicit rollout gates
+        env:
+          PROMOTION: ${{ inputs.promotion }}
+          COMPATIBILITY: ${{ inputs.compatibility-manifest }}
+        run: |
+          python - <<'PY'
+          import json, os
+          promotion = json.load(open(os.environ['PROMOTION'], encoding='utf-8'))
+          compatibility = json.load(open(os.environ['COMPATIBILITY'], encoding='utf-8'))
+          assert promotion['schemaVersion'] == 1
+          assert promotion['environment'] in ('test', 'production')
+          assert promotion['compatibilityCommit'] == compatibility['qualification']['commit']
+          assert promotion['steps'] == ['verify-infrastructure', 'migrate', 'rollout', 'health', 'smoke']
+          assert promotion['rollbackManifest']
+          PY

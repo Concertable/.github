@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main]
 
@@ -20,7 +21,7 @@ jobs:
       - run: node --test tests/*.test.mjs
 
   ci-complete:
-    name: Required CI gate
+    name: ci-complete
     if: ${{ always() }}
     needs: [validate]
     runs-on: ubuntu-latest
