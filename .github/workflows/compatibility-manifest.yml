@@ -26,6 +26,7 @@ jobs:
           assert data['images'] and data['packages']
           for item in data['images']:
               assert item['name'].startswith('ghcr.io/concertable/')
+              assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?', item['tag'])
               assert re.fullmatch(r'sha256:[0-9a-f]{64}', item['digest'])
           for item in data['packages']:
               assert item['datasource'] in ('nuget', 'npm') and item['name'] and item['version']

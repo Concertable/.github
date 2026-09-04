@@ -16,7 +16,7 @@
       "customType": "regex",
       "description": "Images in compatibility and environment manifests",
       "managerFilePatterns": ["/(^|/)(compatibility|environments?)[-/].*\\.json$/", "/(^|/)(compatibility|environment)-manifest\\.json$/"],
-      "matchStrings": ["\\{\\s*\"name\"\\s*:\\s*\"(?<depName>ghcr\\.io/concertable/[^\"]+)\"\\s*,\\s*\"digest\"\\s*:\\s*\"(?<currentDigest>sha256:[0-9a-f]{64})\"\\s*\\}"],
+      "matchStrings": ["\\{\\s*\"name\"\\s*:\\s*\"(?<depName>ghcr\\.io/concertable/[^\"]+)\"\\s*,\\s*\"tag\"\\s*:\\s*\"(?<currentValue>[^\"]+)\"\\s*,\\s*\"digest\"\\s*:\\s*\"(?<currentDigest>sha256:[0-9a-f]{64})\"\\s*\\}"],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
     }
@@ -61,7 +61,7 @@
     {
       "description": "Shared dotnet platform train",
       "matchDatasources": ["nuget"],
-      "matchPackageNames": ["/^Concertable\\.(?!Auth|B2B|Customer|Payment|Search)/"],
+      "matchPackageNames": ["/^Concertable\\.(AppHost|Build|Contracts|DataAccess|Kernel|Messaging|ServiceDefaults)(?:\\.|$)/"],
       "groupName": "platform dotnet train"
     },
     {

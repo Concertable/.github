@@ -4,6 +4,7 @@ on:
   workflow_call:
     inputs:
       image: {description: Fully qualified lowercase GHCR image name, required: true, type: string}
+      version: {description: Immutable release version or fixture identifier, required: true, type: string}
       context: {required: false, default: ., type: string}
       dockerfile: {required: false, default: Dockerfile, type: string}
       publish: {description: Publish from an explicitly dispatched protected release ref, required: false, default: false, type: boolean}
@@ -25,7 +26,7 @@ jobs:
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
-          tags: ${{ inputs.image }}:${{ github.sha }}
+          tags: ${{ inputs.image }}:${{ inputs.version }}
           outputs: type=docker,dest=${{ runner.temp }}/image.tar
           provenance: false
           sbom: false
@@ -66,7 +67,7 @@ jobs:
         with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
       - name: Push verified image and resolve registry digest
         id: push
-        env: {IMAGE: "${{ inputs.image }}", TAG: "${{ github.sha }}"}
+        env: {IMAGE: "${{ inputs.image }}", TAG: "${{ inputs.version }}"}
         run: |
           docker push "$IMAGE:$TAG"
           digest="$(docker buildx imagetools inspect "$IMAGE:$TAG" --format '{{json .Manifest.Digest}}' | tr -d '"')"

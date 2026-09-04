@@ -69,16 +69,13 @@ test('the complete durable owner-team roster is declared', () => {
 
 test('Renovate sees package versions and image digests in both manifest owners', () => {
   const config = JSON.parse(readFileSync(new URL('../renovate-config.json', import.meta.url), 'utf8'))
+  const compatibility = readFileSync(new URL('../fixtures/compatibility-manifest.json', import.meta.url), 'utf8')
+  const environment = readFileSync(new URL('../fixtures/environment-manifest.json', import.meta.url), 'utf8')
   assert.equal(config.customManagers.length, 2)
   assert.ok(config.customManagers.every(({managerFilePatterns}) => managerFilePatterns.some((pattern) => pattern.includes('manifest'))))
-  assert.match(
-    '{"datasource":"nuget","name":"Concertable.Auth.Contracts","version":"1.2.3"}',
-    new RegExp(config.customManagers[0].matchStrings[0]),
-  )
-  assert.match(
-    '{"name":"ghcr.io/concertable/auth","digest":"sha256:' + 'a'.repeat(64) + '"}',
-    new RegExp(config.customManagers[1].matchStrings[0]),
-  )
+  assert.match(compatibility, new RegExp(config.customManagers[0].matchStrings[0]))
+  assert.match(compatibility, new RegExp(config.customManagers[1].matchStrings[0]))
+  assert.match(environment, new RegExp(config.customManagers[1].matchStrings[0]))
 })
 
 test('publication authority is isolated from caller build code', () => {

@@ -7,7 +7,6 @@ on:
       terraform-version: {required: false, default: 1.13.1, type: string}
       run-plan: {required: false, default: false, type: boolean}
       apply: {description: Apply the saved plan from a protected explicit dispatch, required: false, default: false, type: boolean}
-      environment: {required: false, default: test, type: string}
     secrets:
       AZURE_CLIENT_ID: {required: false}
       AZURE_TENANT_ID: {required: false}
@@ -36,7 +35,7 @@ jobs:
     needs: validate
     if: ${{ inputs.run-plan && github.ref_protected && (github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: release
     permissions: {contents: read, id-token: write}
     defaults:
       run: {working-directory: "${{ inputs.working-directory }}"}
@@ -60,7 +59,7 @@ jobs:
     needs: plan
     if: ${{ inputs.apply && github.ref_protected && (github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: release
     permissions: {contents: read, id-token: write}
     defaults:
       run: {working-directory: "${{ inputs.working-directory }}"}

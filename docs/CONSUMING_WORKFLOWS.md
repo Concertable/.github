@@ -36,10 +36,10 @@ Available contracts:
 - `configuration-rollback.yml`: immutable last-known-good target and operator/runbook evidence.
 
 `repository-settings/` contains declarative templates, not raw endpoint payloads. Run
-`pwsh scripts/apply-repository-settings.ps1 -Repository Concertable/<name>` to create/update teams, grant the
+`pwsh scripts/apply-repository-settings.ps1 -Repository Concertable/<name> -OwnerTeamSlug <declared-slug>` to create/update teams, grant the
 declared owner team, create the release environment, and replace the main ruleset after resolving live team
 and repository IDs. The script strips derived team slugs from create requests and verifies the returned
-objects. Templates contain no secret values.
+policy-bearing fields. Valid owner slugs are declared in `repository-settings/teams.json`. Templates contain no secret values.
 
 The accepted manifest shapes are documented in [MANIFEST_CONTRACTS.md](MANIFEST_CONTRACTS.md). They deliberately
 record dependency names and immutable digests/versions in a Renovate-readable form.
