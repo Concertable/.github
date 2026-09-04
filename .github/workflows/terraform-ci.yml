@@ -51,7 +51,7 @@ jobs:
         with: {terraform_version: "${{ inputs.terraform-version }}"}
       - run: terraform init -input=false
       - run: terraform plan -input=false -out=tfplan
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with: {name: terraform-plan, path: "${{ inputs.working-directory }}/tfplan", if-no-files-found: error}
 
   apply:
@@ -74,6 +74,6 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with: {terraform_version: "${{ inputs.terraform-version }}"}
       - run: terraform init -input=false
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with: {name: terraform-plan, path: "${{ inputs.working-directory }}"}
       - run: terraform apply -input=false tfplan

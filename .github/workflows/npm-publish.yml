@@ -44,7 +44,7 @@ jobs:
           npm init --yes
           npm config set @concertable:registry https://npm.pkg.github.com
           npm install "$RUNNER_TEMP"/packages/*.tgz --ignore-scripts
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with: {name: npm-package, path: "${{ runner.temp }}/packages/*.tgz", if-no-files-found: error}
 
   publish:
@@ -55,7 +55,7 @@ jobs:
     environment: release
     permissions: {contents: read, packages: write, id-token: write, attestations: write}
     steps:
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with: {name: npm-package, path: "${{ runner.temp }}/packages"}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with: {node-version: "${{ inputs.node-version }}", registry-url: https://npm.pkg.github.com, scope: '@concertable'}
