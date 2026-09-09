@@ -16,6 +16,8 @@ jobs:
     name: Pack and verify
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: read}
+    # See dotnet-ci.yml: a consumer's nuget.config reads its feed credential from this variable.
+    env: {GITHUB_PACKAGES_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: {fetch-depth: 0, persist-credentials: false}
