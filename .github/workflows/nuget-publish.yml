@@ -56,7 +56,11 @@ jobs:
           dotnet new nugetconfig --output "$RUNNER_TEMP/consumer" --force
           dotnet nuget add source "$RUNNER_TEMP/packages" --name candidate --configfile "$RUNNER_TEMP/consumer/nuget.config"
           dotnet nuget add source https://nuget.pkg.github.com/Concertable/index.json --name github --username Concertable --password "$NUGET_AUTH_TOKEN" --store-password-in-clear-text --configfile "$RUNNER_TEMP/consumer/nuget.config"
-          dotnet restore "$RUNNER_TEMP/consumer/Consumer.csproj" --configfile "$RUNNER_TEMP/consumer/nuget.config" --packages "$RUNNER_TEMP/consumer/packages"
+          # Packages restore OUTSIDE the project directory: a package that ships .cs files (Scriban
+          # does) would otherwise be swept up by the SDK's **/*.cs glob and compiled alongside its
+          # own assembly, failing the verify with CS0121 ambiguity that says nothing about the
+          # package under test.
+          dotnet restore "$RUNNER_TEMP/consumer/Consumer.csproj" --configfile "$RUNNER_TEMP/consumer/nuget.config" --packages "$RUNNER_TEMP/consumer-packages"
           dotnet build "$RUNNER_TEMP/consumer/Consumer.csproj" --configuration Release --no-restore
           rm -f "$RUNNER_TEMP/consumer/nuget.config"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
