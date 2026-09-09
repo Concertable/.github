@@ -32,6 +32,10 @@ jobs:
   verify:
     name: Build and test
     runs-on: ubuntu-latest
+    env:
+      # A consumer's nuget.config clears inherited sources and reads its feed credential from this
+      # variable, so setup-dotnet's own credentialed source is discarded before restore sees it.
+      GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
