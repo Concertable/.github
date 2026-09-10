@@ -25,7 +25,9 @@ Available contracts:
 
 - `dotnet-ci.yml`: restore, Release build, and optional tests for one solution or project.
 - `node-ci.yml`: clean npm install followed by selected lint, typecheck, test, and build scripts.
-- `nuget-publish.yml`: pack, attest, optionally publish, and retain NuGet packages.
+- `nuget-publish.yml`: pack, attest, optionally publish, and retain NuGet packages. A caller whose
+  package ids are still bound to a different repository passes `secrets: {PACKAGES_TOKEN: ...}`,
+  because `GITHUB_TOKEN` only authorises packages bound to the calling repository.
 - `npm-publish.yml`: install/test, pack, clean-consumer install, attest, and optionally publish one npm package.
 - `container-publish.yml`: BuildKit build, critical-vulnerability scan, SBOM/provenance, keyless signing, and optional GHCR push.
 - `apphost-smoke.yml`: restore/build an AppHost and require a health endpoint before timeout.

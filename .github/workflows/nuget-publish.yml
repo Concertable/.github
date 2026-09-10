@@ -7,6 +7,13 @@ on:
       dotnet-version: {required: false, default: 10.0.x, type: string}
       configuration: {required: false, default: Release, type: string}
       publish: {description: Publish from an explicitly dispatched protected release ref, required: false, default: false, type: boolean}
+    secrets:
+      PACKAGES_TOKEN:
+        description: >-
+          Account-scoped token with write:packages. GITHUB_TOKEN is scoped to the calling repository
+          and cannot write a package bound to a different one, so a caller publishing ids still bound
+          elsewhere must pass this. Falls back to GITHUB_TOKEN when absent.
+        required: false
 
 permissions:
   contents: read
@@ -79,5 +86,5 @@ jobs:
       - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with: {subject-path: "${{ runner.temp }}/packages/*.nupkg"}
       - name: Publish transferred packages
-        env: {NUGET_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+        env: {NUGET_AUTH_TOKEN: "${{ secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}"}
         run: dotnet nuget push "$RUNNER_TEMP/packages/*.nupkg" --api-key "$NUGET_AUTH_TOKEN" --source https://nuget.pkg.github.com/Concertable/index.json --skip-duplicate
