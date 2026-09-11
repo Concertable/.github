@@ -8,6 +8,13 @@ on:
       configuration: {required: false, default: Release, type: string}
       publish: {description: Publish from an explicitly dispatched protected release ref, required: false, default: false, type: boolean}
     secrets:
+      PACKAGES_READ_TOKEN:
+        description: >-
+          Account-scoped token with read:packages, used by the verify job. GITHUB_TOKEN can only read
+          packages bound to the calling repository, so a caller whose solution restores ids still bound
+          elsewhere must pass this or verify fails NU1301/403 on the first such package. Falls back to
+          PACKAGES_TOKEN, then GITHUB_TOKEN.
+        required: false
       PACKAGES_TOKEN:
         description: >-
           Account-scoped token with write:packages. GITHUB_TOKEN is scoped to the calling repository
@@ -24,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: read}
     # See dotnet-ci.yml: a consumer's nuget.config reads its feed credential from this variable.
-    env: {GITHUB_PACKAGES_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+    env: {GITHUB_PACKAGES_TOKEN: "${{ secrets.PACKAGES_READ_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}"}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: {fetch-depth: 0, persist-credentials: false}
@@ -32,14 +39,14 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
           source-url: https://nuget.pkg.github.com/Concertable/index.json
-        env: {NUGET_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+        env: {NUGET_AUTH_TOKEN: "${{ secrets.PACKAGES_READ_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}"}
       - name: Pack
         env: {CONFIGURATION: "${{ inputs.configuration }}", PROJECT: "${{ inputs.project }}"}
         run: dotnet pack "$PROJECT" --configuration "$CONFIGURATION" --output "$RUNNER_TEMP/packages"
       - name: Require packages
         run: compgen -G "$RUNNER_TEMP/packages/*.nupkg" >/dev/null
       - name: Verify clean consumer
-        env: {NUGET_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+        env: {NUGET_AUTH_TOKEN: "${{ secrets.PACKAGES_READ_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}"}
         run: |
           mkdir "$RUNNER_TEMP/consumer"
           python - "$RUNNER_TEMP/packages" "$RUNNER_TEMP/consumer/Consumer.csproj" <<'PY'
