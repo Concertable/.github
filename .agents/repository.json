@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "access": {
+    "method": "app",
+    "app": "tomjseery-bot"
+  },
+  "merge": {
+    "approval": "none",
+    "merge": "agents",
+    "default_branch_push": "none"
+  }
+}
